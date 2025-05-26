@@ -1,5 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+    RAG Chat Interface
+    
+    Configuration:
+    To connect to a backend running on a different port or server,
+    update the API_BASE_URL constant in the JavaScript section below.
+    
+    Example configurations:
+    - Local backend on port 3001: 'http://localhost:3001'
+    - Remote backend: 'https://your-backend-domain.com'
+    - Different host: 'http://192.168.1.100:3000'
+-->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,26 +25,28 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8f9fa;
+            background: #ffffff;
             height: 100vh;
+            margin: 0;
+            padding: 0;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: stretch;
         }
 
         .chat-container {
             width: 100%;
-            max-width: 400px;
             height: 100vh;
             background: white;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            box-shadow: none;
+            border-radius: 0;
         }
 
         .chat-header {
             background: white;
-            padding: 20px 20px 10px 20px;
+            padding: 16px 20px 12px 20px;
             border-bottom: 1px solid #f0f0f0;
             text-align: center;
         }
@@ -51,7 +65,7 @@
 
         .chat-messages {
             flex: 1;
-            padding: 20px;
+            padding: 16px;
             overflow-y: auto;
             background: white;
         }
@@ -154,7 +168,7 @@
         }
 
         .chat-input-container {
-            padding: 12px 20px 20px 20px;
+            padding: 12px 16px 16px 16px;
             background: white;
             border-top: 1px solid #f0f0f0;
         }
@@ -237,26 +251,26 @@
         }
 
         @media (min-width: 768px) {
-            .chat-container {
-                height: 90vh;
-                border-radius: 12px;
-                max-height: 800px;
-                max-width: 600px;
+            .chat-header {
+                padding: 20px 24px 16px 24px;
+            }
+            
+            .chat-messages {
+                padding: 20px;
+            }
+            
+            .chat-input-container {
+                padding: 16px 20px 20px 20px;
             }
         }
 
         @media (min-width: 1024px) {
-            .chat-container {
-                max-width: 800px;
-                height: 85vh;
-            }
-            
             .message-content {
                 max-width: 75%;
             }
             
             .chat-header {
-                padding: 24px 24px 16px 24px;
+                padding: 24px 32px 20px 32px;
             }
             
             .chat-title {
@@ -272,7 +286,7 @@
             }
             
             .chat-input-container {
-                padding: 16px 24px 24px 24px;
+                padding: 20px 24px 24px 24px;
             }
             
             .chat-input-form {
@@ -304,6 +318,124 @@
             background: #d1d1d6;
             border-radius: 2px;
         }
+
+        .setup-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 20px;
+            text-align: center;
+        }
+
+        .setup-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1c1c1e;
+            margin-bottom: 8px;
+        }
+
+        .setup-subtitle {
+            font-size: 16px;
+            color: #8e8e93;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+
+        .setup-form {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .setup-input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid #f2f2f7;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.3s ease;
+            margin-bottom: 16px;
+        }
+
+        .setup-input:focus {
+            border-color: #007aff;
+        }
+
+        .setup-input::placeholder {
+            color: #8e8e93;
+        }
+
+        .setup-button {
+            width: 100%;
+            padding: 16px 20px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .setup-button:hover:not(:disabled) {
+            opacity: 0.8;
+        }
+
+        .setup-button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .setup-examples {
+            margin-top: 24px;
+            text-align: left;
+        }
+
+        .setup-examples h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1c1c1e;
+            margin-bottom: 8px;
+        }
+
+        .setup-examples p {
+            font-size: 12px;
+            color: #8e8e93;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #f2f2f7;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .connection-status.connected {
+            background: #e8f5e8;
+            color: #2d7d32;
+        }
+
+        .change-document {
+            background: none;
+            border: none;
+            color: #007aff;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -313,14 +445,44 @@
             <div class="chat-subtitle">Ask questions about your documents</div>
         </div>
         
-        <div class="chat-messages" id="chatMessages">
-            <div class="welcome-message">
-                <div class="welcome-title">What can I help with?</div>
-                Ask me anything about the documents in your collection.
+        <!-- Document Setup Interface -->
+        <div class="setup-container" id="setupContainer">
+            <div class="setup-title">Connect Your Document</div>
+            <div class="setup-subtitle">
+                Connect a Google Sheets or Google Docs document to start asking questions about your data.
+            </div>
+            
+            <form class="setup-form" id="setupForm">
+                <input 
+                    type="url" 
+                    class="setup-input" 
+                    id="documentUrl" 
+                    placeholder="Paste Google Sheets or Google Docs URL here..."
+                    required
+                />
+                <button type="submit" class="setup-button" id="setupButton">
+                    Connect Document
+                </button>
+            </form>
+            
+            <div class="setup-examples">
+                <h4>Supported formats:</h4>
+                <p>Google Sheets: https://docs.google.com/spreadsheets/d/...</p>
+                <p>Google Docs: https://docs.google.com/document/d/...</p>
+                <br>
+                <p style="font-style: italic;">Note: Documents must be publicly accessible (Anyone with the link can view)</p>
             </div>
         </div>
         
-        <div class="typing-indicator" id="typingIndicator">
+        <!-- Chat Interface (hidden initially) -->
+        <div class="chat-messages hidden" id="chatMessages">
+            <div class="connection-status connected" id="connectionStatus">
+                <span id="connectionText">Connected to document</span>
+                <button class="change-document" id="changeDocument">Change</button>
+            </div>
+        </div>
+        
+        <div class="typing-indicator hidden" id="typingIndicator">
             <div class="typing-content">
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
@@ -328,7 +490,7 @@
             </div>
         </div>
         
-        <div class="chat-input-container">
+        <div class="chat-input-container hidden" id="chatInputContainer">
             <form class="chat-input-form" id="chatForm">
                 <textarea 
                     class="chat-input" 
@@ -344,22 +506,83 @@
     </div>
 
     <script>
+        // Configuration - Update this URL to match your backend server
+        const API_BASE_URL = 'http://localhost:3000';
+        
         class ChatInterface {
             constructor() {
+                this.setupContainer = document.getElementById('setupContainer');
                 this.chatMessages = document.getElementById('chatMessages');
+                this.chatInputContainer = document.getElementById('chatInputContainer');
+                this.typingIndicator = document.getElementById('typingIndicator');
+                
+                this.setupForm = document.getElementById('setupForm');
+                this.documentUrl = document.getElementById('documentUrl');
+                this.setupButton = document.getElementById('setupButton');
+                
                 this.chatForm = document.getElementById('chatForm');
                 this.chatInput = document.getElementById('chatInput');
                 this.sendButton = document.getElementById('sendButton');
-                this.typingIndicator = document.getElementById('typingIndicator');
+                
+                this.connectionStatus = document.getElementById('connectionStatus');
+                this.connectionText = document.getElementById('connectionText');
+                this.changeDocument = document.getElementById('changeDocument');
+                
+                this.currentDocument = null;
                 
                 this.initializeEventListeners();
-                this.autoResizeTextarea();
             }
 
             initializeEventListeners() {
-                this.chatForm.addEventListener('submit', (e) => this.handleSubmit(e));
+                this.setupForm.addEventListener('submit', (e) => this.handleSetupSubmit(e));
+                this.chatForm.addEventListener('submit', (e) => this.handleChatSubmit(e));
                 this.chatInput.addEventListener('keydown', (e) => this.handleKeyDown(e));
                 this.chatInput.addEventListener('input', () => this.autoResizeTextarea());
+                this.changeDocument.addEventListener('click', () => this.showSetup());
+            }
+
+            async handleSetupSubmit(e) {
+                e.preventDefault();
+                
+                const url = this.documentUrl.value.trim();
+                if (!url) return;
+
+                this.setSetupLoading(true);
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/set-document`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ url }),
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || data.error || 'Failed to connect to document');
+                    }
+
+                    // Store document info
+                    this.currentDocument = {
+                        url: url,
+                        type: data.documentType,
+                        itemCount: data.itemCount
+                    };
+
+                    // Show chat interface
+                    this.showChat();
+                    
+                    // Update connection status
+                    this.updateConnectionStatus();
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    this.showSetupError(error.message);
+                } finally {
+                    this.setSetupLoading(false);
+                }
             }
 
             handleKeyDown(e) {
@@ -374,7 +597,7 @@
                 this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 100) + 'px';
             }
 
-            async handleSubmit(e) {
+            async handleChatSubmit(e) {
                 e.preventDefault();
                 
                 const question = this.chatInput.value.trim();
@@ -389,7 +612,7 @@
                 this.setLoading(true);
 
                 try {
-                    const response = await fetch('http://localhost:3000/ask', {
+                    const response = await fetch(`${API_BASE_URL}/ask`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -406,7 +629,7 @@
                     // Add assistant response
                     this.addMessage(data.answer, 'assistant', {
                         source: data.source,
-                        documentsCount: data.documentsCount
+                        itemCount: data.itemCount
                     });
 
                 } catch (error) {
@@ -414,6 +637,54 @@
                     this.addErrorMessage(error.message);
                 } finally {
                     this.setLoading(false);
+                }
+            }
+
+            showSetup() {
+                this.setupContainer.classList.remove('hidden');
+                this.chatMessages.classList.add('hidden');
+                this.chatInputContainer.classList.add('hidden');
+                this.typingIndicator.classList.add('hidden');
+                this.documentUrl.value = '';
+                this.clearSetupError();
+            }
+
+            showChat() {
+                this.setupContainer.classList.add('hidden');
+                this.chatMessages.classList.remove('hidden');
+                this.chatInputContainer.classList.remove('hidden');
+                this.chatInput.focus();
+            }
+
+            updateConnectionStatus() {
+                if (this.currentDocument) {
+                    const typeText = this.currentDocument.type === 'sheets' ? 'Google Sheets' : 'Google Docs';
+                    this.connectionText.textContent = `Connected to ${typeText} (${this.currentDocument.itemCount} items)`;
+                }
+            }
+
+            setSetupLoading(isLoading) {
+                this.setupButton.disabled = isLoading;
+                this.documentUrl.disabled = isLoading;
+                this.setupButton.textContent = isLoading ? 'Connecting...' : 'Connect Document';
+            }
+
+            showSetupError(message) {
+                // Remove existing error
+                this.clearSetupError();
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = `Error: ${message}`;
+                errorDiv.id = 'setupError';
+                
+                this.setupForm.appendChild(errorDiv);
+            }
+
+            clearSetupError() {
+                const existingError = document.getElementById('setupError');
+                if (existingError) {
+                    existingError.remove();
                 }
             }
 
@@ -439,14 +710,8 @@
                 if (meta) {
                     const metaDiv = document.createElement('div');
                     metaDiv.className = 'message-meta';
-                    metaDiv.textContent = `${meta.source} • ${meta.documentsCount} documents`;
+                    metaDiv.textContent = `${meta.source} • ${meta.itemCount} items`;
                     messageDiv.appendChild(metaDiv);
-                }
-
-                // Remove welcome message if it exists
-                const welcomeMessage = this.chatMessages.querySelector('.welcome-message');
-                if (welcomeMessage) {
-                    welcomeMessage.remove();
                 }
 
                 this.chatMessages.appendChild(messageDiv);

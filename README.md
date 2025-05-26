@@ -1,22 +1,25 @@
-# LangChain RAG PoC with MongoDB and OpenAI
+# RAG Chat with Google Sheets/Docs and OpenAI
 
-A Node.js + Express proof of concept that demonstrates Retrieval Augmented Generation (RAG) using MongoDB as a data source and OpenAI's GPT models for language model capabilities.
+A Node.js + Express application that demonstrates Retrieval Augmented Generation (RAG) using Google Sheets or Google Docs as data sources and OpenAI's GPT models for intelligent question-answering.
 
 ## Features
 
+- **Document Connection Interface**: Easy setup to connect Google Sheets or Google Docs
 - **Chat Web Interface**: Beautiful, responsive chat UI for easy interaction
-- RESTful API endpoint `/ask` for question-answering
-- MongoDB integration using Mongoose ODM
+- RESTful API endpoints for document connection and question-answering
+- Google Sheets integration (reads all sheets and rows)
+- Google Docs integration (extracts full text content)
 - OpenAI integration using GPT-4o-mini model
 - Environment-based configuration
-- Graceful error handling and shutdown
-- Health check endpoint
+- Graceful error handling
+- Real-time document status display
 
 ## Prerequisites
 
 - Node.js 14.x or higher
-- MongoDB instance (local or cloud)
 - OpenAI API key
+- Google API key (for accessing Google Sheets/Docs)
+- Google Sheets or Google Docs with public read access
 
 ## Setup & Installation
 
@@ -35,7 +38,20 @@ A Node.js + Express proof of concept that demonstrates Retrieval Augmented Gener
    - Create an API key in your OpenAI dashboard
    - Keep your API key secure and never commit it to version control
 
-4. **Configure environment variables**:
+4. **Set up Google API Key**:
+   - Go to the [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Google Sheets API and Google Docs API:
+     - Go to "APIs & Services" > "Library"
+     - Search for "Google Sheets API" and enable it
+     - Search for "Google Docs API" and enable it
+   - Create an API key:
+     - Go to "APIs & Services" > "Credentials"
+     - Click "Create Credentials" > "API Key"
+     - Copy the generated API key
+   - (Optional) Restrict the API key to only Google Sheets and Docs APIs for security
+
+5. **Configure environment variables**:
    
    Create a `.env` file in the project root with the following variables:
 
@@ -43,11 +59,8 @@ A Node.js + Express proof of concept that demonstrates Retrieval Augmented Gener
    # OpenAI Configuration
    OPENAI_API_KEY=your-openai-api-key
 
-   # MongoDB Configuration
-   MONGODB_URI=mongodb://localhost:27017
-   # or for MongoDB Atlas: mongodb+srv://username:password@cluster.mongodb.net/
-   MONGODB_DB_NAME=your-database-name
-   MONGODB_COLLECTION_NAME=your-collection-name
+   # Google API Configuration
+   GOOGLE_API_KEY=your-google-api-key
 
    # Server Configuration (optional)
    PORT=3000
@@ -58,9 +71,7 @@ A Node.js + Express proof of concept that demonstrates Retrieval Augmented Gener
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
 | `OPENAI_API_KEY` | Your OpenAI API key | Yes | `sk-...` |
-| `MONGODB_URI` | MongoDB connection string | Yes | `mongodb://localhost:27017` |
-| `MONGODB_DB_NAME` | Target database name | Yes | `myDatabase` |
-| `MONGODB_COLLECTION_NAME` | Target collection name | Yes | `documents` |
+| `GOOGLE_API_KEY` | Your Google API key | Yes | `AIza...` |
 | `PORT` | Server port (default: 3000) | No | `3000` |
 
 ## Running the Application
@@ -75,7 +86,7 @@ npm run dev
 npm start
 ```
 
-The server will start on the configured port (default: 3000) and connect to MongoDB automatically using Mongoose.
+The server will start on the configured port (default: 3000).
 
 ## Accessing the Application
 
@@ -86,11 +97,26 @@ http://localhost:3000
 ```
 
 This provides a beautiful, modern chat interface where you can:
-- Ask questions about your MongoDB documents
-- See real-time typing indicators
-- View conversation history
-- Get source information for each response
-- Use on both desktop and mobile devices
+
+1. **Connect Your Document**: 
+   - Paste a Google Sheets or Google Docs URL
+   - The system will automatically detect the document type
+   - Fetch and process all data from the document
+
+2. **Start Chatting**:
+   - Ask questions about your document data
+   - See real-time typing indicators
+   - View conversation history
+   - Get source information for each response
+   - Switch documents anytime
+
+### Document Requirements
+
+Your Google Sheets or Google Docs must be:
+- **Publicly accessible** with "Anyone with the link can view" permissions
+- **Valid Google URLs** in the format:
+  - Sheets: `https://docs.google.com/spreadsheets/d/[ID]/...`
+  - Docs: `https://docs.google.com/document/d/[ID]/...`
 
 ### API Endpoints
 
@@ -104,125 +130,135 @@ Returns:
 {
   "status": "ok",
   "timestamp": "2024-01-10T12:00:00.000Z",
-  "database": "connected"
+  "documentConnected": true,
+  "documentType": "sheets"
 }
 ```
 
-#### Ask Endpoint
+#### Connect Document
 ```bash
-POST /ask
+POST /set-document
 Content-Type: application/json
 
 {
-  "question": "What is the main topic of the documents?"
+  "url": "https://docs.google.com/spreadsheets/d/your-sheet-id/..."
 }
 ```
 
 Returns:
 ```json
 {
-  "answer": "Based on the documents in the collection...",
-  "source": "MongoDB collection: your-collection-name",
-  "documentsCount": 5
+  "success": true,
+  "message": "Successfully connected to Google Sheets",
+  "documentType": "sheets",
+  "itemCount": 25,
+  "url": "https://docs.google.com/spreadsheets/d/..."
 }
 ```
+
+#### Ask Questions
+```bash
+POST /ask
+Content-Type: application/json
+
+{
+  "question": "What is the summary of the data?"
+}
+```
+
+Returns:
+```json
+{
+  "answer": "Based on the Google Sheets data...",
+  "source": "Google Sheets: https://docs.google.com/spreadsheets/d/...",
+  "itemCount": 25,
+  "documentType": "sheets"
+}
+```
+
+## How It Works
+
+1. **Document Connection**: When you provide a Google Sheets/Docs URL, the application:
+   - Validates the URL format
+   - Extracts the document ID
+   - Fetches data using Google APIs (no authentication required for public docs)
+   - Processes and stores the data in memory
+
+2. **Data Processing**: 
+   - **Google Sheets**: Reads all sheets, converts rows to structured data with headers
+   - **Google Docs**: Extracts all text content from the document
+   - Creates a searchable context from the processed data
+
+3. **Question Answering**: When you ask a question:
+   - The system combines your question with the document context
+   - Sends the combined prompt to OpenAI's GPT-4o-mini model
+   - Returns an intelligent answer based on your document data
+
+## Supported Document Types
+
+### Google Sheets
+- Reads all sheets in the spreadsheet
+- Uses first row as headers
+- Processes all data rows
+- Maintains sheet names and row references
+
+### Google Docs
+- Extracts all text content
+- Preserves document structure
+- Includes document title
+- Handles formatted text
 
 ## Example Usage
 
 ### Using curl:
 ```bash
+# Connect a document
+curl -X POST http://localhost:3000/set-document \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://docs.google.com/spreadsheets/d/your-sheet-id/edit"
+  }'
+
+# Ask a question
 curl -X POST http://localhost:3000/ask \
   -H "Content-Type: application/json" \
   -d '{
-    "question": "What information is available about product features?"
+    "question": "What are the main trends in the data?"
   }'
 ```
-
-### Using Postman:
-1. Create a new POST request
-2. URL: `http://localhost:3000/ask`
-3. Headers: `Content-Type: application/json`
-4. Body (raw JSON):
-   ```json
-   {
-     "question": "Summarize the main points from the documents"
-   }
-   ```
-
-### Using JavaScript (fetch):
-```javascript
-const response = await fetch('http://localhost:3000/ask', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    question: 'What are the key insights from the data?'
-  })
-});
-
-const data = await response.json();
-console.log(data.answer);
-```
-
-## How It Works
-
-1. **Document Retrieval**: When a question is received, the application connects to MongoDB using Mongoose and fetches all documents from the specified collection.
-
-2. **Context Building**: Documents are processed to extract relevant fields (title, description, content, etc.) and combined into a single context blob.
-
-3. **LLM Processing**: The question and context are sent to OpenAI's GPT-4o-mini model for processing.
-
-4. **Response Generation**: The LLM's answer is returned along with the source information and document count.
 
 ## Error Handling
 
 The application handles various error scenarios:
-- Missing or invalid request body
-- MongoDB connection failures
+- Invalid or inaccessible document URLs
+- Missing or invalid request bodies
 - OpenAI API errors (authentication, rate limits, etc.)
-- Missing environment variables
+- Google API access issues
 
 All errors return appropriate HTTP status codes and descriptive error messages.
 
-## MongoDB Document Structure
-
-The application uses a flexible Mongoose schema that accepts any document structure. It looks for these common fields in documents:
-- `title`
-- `name`
-- `description`
-- `content`
-- `text`
-- `summary`
-
-If none of these fields exist, the entire document is stringified and used as context (excluding MongoDB's `_id` and `__v` fields).
-
-## OpenAI Model
-
-The application uses the `gpt-4o-mini` model, which provides:
-- Cost-effective processing
-- Good performance for question-answering tasks
-- Support for large context windows
-- Fast response times
-
 ## Troubleshooting
 
-### MongoDB Connection Issues
-- Verify your `MONGODB_URI` is correct
-- Ensure MongoDB is running and accessible
-- Check network/firewall settings
-- Verify database and collection names
+### Document Access Issues
+- Ensure the document is publicly accessible ("Anyone with the link can view")
+- Verify the URL format is correct
+- Check that the document exists and isn't deleted
+
+### Google API Issues
+- Verify your `GOOGLE_API_KEY` is correct and active
+- Ensure Google Sheets API and Google Docs API are enabled in your Google Cloud project
+- Check that your API key has the necessary permissions
+- If using API key restrictions, make sure Google Sheets and Docs APIs are allowed
 
 ### OpenAI API Issues
 - Verify your `OPENAI_API_KEY` is correct and active
 - Check your OpenAI account has sufficient credits
 - Monitor rate limits (the app handles 429 errors gracefully)
-- Ensure your API key has the necessary permissions
 
-### No Documents Found
-- Verify the database and collection names
-- Ensure the collection contains documents
-- Check MongoDB connection permissions
+### No Data Found
+- For Sheets: Ensure there's data beyond the header row
+- For Docs: Ensure the document has text content
+- Check document permissions
 
 ## License
 

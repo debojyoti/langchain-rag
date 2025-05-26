@@ -1,9 +1,9 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
 const OpenAI = require('openai');
 const path = require('path');
 const cors = require('cors');
+const { google } = require('googleapis');
 
 // Initialize Express app
 const app = express();
@@ -18,17 +18,13 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Environment variables
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI;
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME;
-const MONGODB_COLLECTION_NAME = process.env.MONGODB_COLLECTION_NAME;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'MONGODB_URI',
-  'MONGODB_DB_NAME',
-  'MONGODB_COLLECTION_NAME',
-  'OPENAI_API_KEY'
+  'OPENAI_API_KEY',
+  'GOOGLE_API_KEY'
 ];
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -42,29 +38,126 @@ const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
-// Define a flexible Mongoose schema for documents
-const documentSchema = new mongoose.Schema({}, { 
-  strict: false, // Allow any fields
-  collection: MONGODB_COLLECTION_NAME 
-});
+// Store the current document URL and data
+let currentDocumentUrl = null;
+let currentDocumentData = null;
+let currentDocumentType = null;
 
-let DocumentModel;
+// Helper function to extract Google Sheets ID from URL
+function extractSheetsId(url) {
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : null;
+}
 
-// Connect to MongoDB using Mongoose
-async function connectToMongoDB() {
+// Helper function to extract Google Docs ID from URL
+function extractDocsId(url) {
+  const match = url.match(/\/document\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : null;
+}
+
+// Helper function to determine document type
+function getDocumentType(url) {
+  if (url.includes('spreadsheets')) return 'sheets';
+  if (url.includes('document')) return 'docs';
+  return null;
+}
+
+// Function to fetch Google Sheets data
+async function fetchGoogleSheetsData(spreadsheetId) {
   try {
-    await mongoose.connect(MONGODB_URI, {
-      dbName: MONGODB_DB_NAME,
+    const sheets = google.sheets({ version: 'v4', auth: GOOGLE_API_KEY });
+    
+    // Get spreadsheet metadata to find all sheets
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: spreadsheetId,
     });
-    console.log('Connected to MongoDB successfully using Mongoose');
     
-    // Create the model after connection
-    DocumentModel = mongoose.model('Document', documentSchema);
+    const sheetNames = spreadsheet.data.sheets.map(sheet => sheet.properties.title);
+    const allData = [];
     
-    console.log(`Using database: ${MONGODB_DB_NAME}, collection: ${MONGODB_COLLECTION_NAME}`);
+    // Fetch data from all sheets
+    for (const sheetName of sheetNames) {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: spreadsheetId,
+        range: `${sheetName}!A:Z`, // Get all columns up to Z
+      });
+      
+      const values = response.data.values || [];
+      if (values.length > 0) {
+        const headers = values[0];
+        const rows = values.slice(1);
+        
+        rows.forEach((row, index) => {
+          const rowData = {};
+          headers.forEach((header, colIndex) => {
+            if (row[colIndex]) {
+              rowData[header] = row[colIndex];
+            }
+          });
+          
+          if (Object.keys(rowData).length > 0) {
+            allData.push({
+              sheet: sheetName,
+              row: index + 2, // +2 because we skip header and 0-index
+              data: rowData
+            });
+          }
+        });
+      }
+    }
+    
+    return allData;
   } catch (error) {
-    console.error('Failed to connect to MongoDB:', error);
-    process.exit(1);
+    console.error('Error fetching Google Sheets data:', error);
+    if (error.status === 403) {
+      throw new Error('Access denied. Please ensure the Google Sheet is publicly accessible and your Google API key is valid.');
+    } else if (error.status === 404) {
+      throw new Error('Google Sheet not found. Please check the URL and ensure the sheet exists.');
+    } else {
+      throw new Error('Failed to fetch Google Sheets data. Please check your Google API key and sheet permissions.');
+    }
+  }
+}
+
+// Function to fetch Google Docs data
+async function fetchGoogleDocsData(documentId) {
+  try {
+    const docs = google.docs({ version: 'v1', auth: GOOGLE_API_KEY });
+    
+    const response = await docs.documents.get({
+      documentId: documentId,
+    });
+    
+    const document = response.data;
+    let content = '';
+    
+    // Extract text content from the document
+    if (document.body && document.body.content) {
+      document.body.content.forEach(element => {
+        if (element.paragraph) {
+          element.paragraph.elements.forEach(elem => {
+            if (elem.textRun) {
+              content += elem.textRun.content;
+            }
+          });
+        }
+      });
+    }
+    
+    return [{
+      title: document.title,
+      content: content.trim(),
+      type: 'document'
+    }];
+  } catch (error) {
+    console.error('Error fetching Google Docs data:', error);
+    if (error.status === 403) {
+      throw new Error('Access denied. Please ensure the Google Doc is publicly accessible and your Google API key is valid.');
+    } else if (error.status === 404) {
+      throw new Error('Google Doc not found. Please check the URL and ensure the document exists.');
+    } else {
+      throw new Error('Failed to fetch Google Docs data. Please check your Google API key and document permissions.');
+    }
   }
 }
 
@@ -73,13 +166,85 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    documentConnected: !!currentDocumentUrl,
+    documentType: currentDocumentType
   });
+});
+
+// Endpoint to set document URL
+app.post('/set-document', async (req, res) => {
+  try {
+    const { url } = req.body;
+    
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({
+        error: 'Invalid request body. Expected { "url": "google_document_url" }'
+      });
+    }
+    
+    const documentType = getDocumentType(url);
+    if (!documentType) {
+      return res.status(400).json({
+        error: 'Invalid URL. Please provide a Google Sheets or Google Docs URL.'
+      });
+    }
+    
+    let documentId;
+    if (documentType === 'sheets') {
+      documentId = extractSheetsId(url);
+    } else {
+      documentId = extractDocsId(url);
+    }
+    
+    if (!documentId) {
+      return res.status(400).json({
+        error: 'Could not extract document ID from URL. Please check the URL format.'
+      });
+    }
+    
+    // Fetch data from the document
+    console.log(`Fetching data from Google ${documentType}...`);
+    let data;
+    if (documentType === 'sheets') {
+      data = await fetchGoogleSheetsData(documentId);
+    } else {
+      data = await fetchGoogleDocsData(documentId);
+    }
+    
+    // Store the data
+    currentDocumentUrl = url;
+    currentDocumentData = data;
+    currentDocumentType = documentType;
+    
+    console.log(`Successfully connected to Google ${documentType} with ${data.length} items`);
+    
+    res.json({
+      success: true,
+      message: `Successfully connected to Google ${documentType}`,
+      documentType: documentType,
+      itemCount: data.length,
+      url: url
+    });
+    
+  } catch (error) {
+    console.error('Error setting document:', error);
+    res.status(500).json({
+      error: 'Failed to connect to document',
+      message: error.message
+    });
+  }
 });
 
 // Main /ask endpoint
 app.post('/ask', async (req, res) => {
   try {
+    // Check if document is connected
+    if (!currentDocumentData) {
+      return res.status(400).json({
+        error: 'No document connected. Please set a Google Sheets or Google Docs URL first.'
+      });
+    }
+    
     // Validate request body
     const { question } = req.body;
     if (!question || typeof question !== 'string') {
@@ -88,41 +253,20 @@ app.post('/ask', async (req, res) => {
       });
     }
 
-    // Fetch all documents from MongoDB collection using Mongoose
-    console.log('Fetching documents from MongoDB...');
-    const documents = await DocumentModel.find({}).lean();
-    console.log(`Found ${documents.length} documents`);
-
-    if (documents.length === 0) {
-      return res.json({
-        answer: "No documents found in the collection to provide context.",
-        source: `MongoDB collection: ${MONGODB_COLLECTION_NAME}`
-      });
-    }
+    console.log(`Processing question with ${currentDocumentData.length} items from Google ${currentDocumentType}`);
 
     // Process documents to create context
-    const contextParts = documents.map((doc, index) => {
-      // Extract relevant fields (title, description, content, etc.)
-      const parts = [];
-      
-      // Common field names that might contain useful information
-      const fieldNames = ['title', 'name', 'description', 'content', 'text', 'summary'];
-      
-      fieldNames.forEach(fieldName => {
-        if (doc[fieldName]) {
-          parts.push(`${fieldName}: ${doc[fieldName]}`);
-        }
-      });
-      
-      // If no specific fields found, stringify the entire document (excluding _id and __v)
-      if (parts.length === 0) {
-        const cleanDoc = { ...doc };
-        delete cleanDoc._id;
-        delete cleanDoc.__v;
-        parts.push(JSON.stringify(cleanDoc, null, 2));
+    const contextParts = currentDocumentData.map((item, index) => {
+      if (currentDocumentType === 'sheets') {
+        // For sheets, format the row data
+        const dataStr = Object.entries(item.data)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ');
+        return `Row ${item.row} from sheet "${item.sheet}": ${dataStr}`;
+      } else {
+        // For docs, use the content
+        return `${item.title}: ${item.content}`;
       }
-      
-      return `Document ${index + 1}:\n${parts.join('\n')}`;
     });
 
     const contextBlob = contextParts.join('\n\n---\n\n');
@@ -136,11 +280,11 @@ app.post('/ask', async (req, res) => {
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that answers questions based on the provided context from a MongoDB collection. Provide comprehensive answers based only on the information available in the context."
+          content: `You are a helpful assistant that answers questions based on the provided context from a Google ${currentDocumentType === 'sheets' ? 'Sheets' : 'Docs'} document. Provide comprehensive answers based only on the information available in the context.`
         },
         {
           role: "user",
-          content: `Based on the following context from a MongoDB collection, please answer this question: ${question}
+          content: `Based on the following context from a Google ${currentDocumentType === 'sheets' ? 'Sheets' : 'Docs'} document, please answer this question: ${question}
 
 Context:
 ${contextBlob}
@@ -157,20 +301,16 @@ Please provide a comprehensive answer based on the information available in the 
     // Return the response
     res.json({
       answer: answer,
-      source: `MongoDB collection: ${MONGODB_COLLECTION_NAME}`,
-      documentsCount: documents.length
+      source: `Google ${currentDocumentType === 'sheets' ? 'Sheets' : 'Docs'}: ${currentDocumentUrl}`,
+      itemCount: currentDocumentData.length,
+      documentType: currentDocumentType
     });
 
   } catch (error) {
     console.error('Error processing request:', error);
     
     // Determine error type and send appropriate response
-    if (error.name === 'MongoNetworkError' || error.name === 'MongoServerError') {
-      res.status(503).json({
-        error: 'Database connection error',
-        message: 'Unable to connect to MongoDB'
-      });
-    } else if (error.message && error.message.includes('OpenAI')) {
+    if (error.message && error.message.includes('OpenAI')) {
       res.status(503).json({
         error: 'AI service error',
         message: 'Unable to process request with OpenAI'
@@ -202,12 +342,6 @@ app.use((req, res) => {
 // Graceful shutdown
 async function gracefulShutdown() {
   console.log('\nShutting down gracefully...');
-  try {
-    await mongoose.connection.close();
-    console.log('MongoDB connection closed');
-  } catch (error) {
-    console.error('Error closing MongoDB connection:', error);
-  }
   process.exit(0);
 }
 
@@ -217,12 +351,11 @@ process.on('SIGINT', gracefulShutdown);
 // Start the server
 async function startServer() {
   try {
-    await connectToMongoDB();
-    
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Chat UI available at http://localhost:${PORT}`);
       console.log(`POST /ask endpoint available at http://localhost:${PORT}/ask`);
+      console.log(`POST /set-document endpoint available at http://localhost:${PORT}/set-document`);
       console.log(`Using OpenAI model: gpt-4o-mini`);
     });
   } catch (error) {
