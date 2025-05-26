@@ -1,0 +1,31 @@
+{
+  "name": "langchain-rag-poc",
+  "version": "1.0.0",
+  "description": "Node.js + Express PoC with Google Sheets/Docs and OpenAI integration",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "node test-endpoint.js"
+  },
+  "keywords": [
+    "express",
+    "google-sheets",
+    "google-docs",
+    "openai",
+    "rag"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "googleapis": "^144.0.0",
+    "openai": "^4.73.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7",
+    "axios": "^1.7.2"
+  }
+}
