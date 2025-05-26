@@ -3,9 +3,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const OpenAI = require('openai');
 const path = require('path');
+const cors = require('cors');
 
 // Initialize Express app
 const app = express();
+
+// Enable CORS for all routes
+app.use(cors());
+
 app.use(express.json());
 
 // Serve static files from public directory

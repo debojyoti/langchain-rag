@@ -101,6 +101,28 @@
             border-bottom-left-radius: 5px;
         }
 
+        .message.assistant .message-content p {
+            margin: 0 0 12px 0;
+        }
+
+        .message.assistant .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message.assistant .message-content strong {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .message.assistant .message-content em {
+            font-style: italic;
+            color: #555;
+        }
+
+        .message.assistant .message-content br {
+            line-height: 1.8;
+        }
+
         .message-meta {
             font-size: 0.8rem;
             color: #6c757d;
@@ -346,7 +368,16 @@
 
                 const messageContent = document.createElement('div');
                 messageContent.className = 'message-content';
-                messageContent.textContent = content;
+                
+                // Format the content with proper line breaks and paragraphs
+                if (sender === 'assistant') {
+                    // For assistant messages, format with proper line breaks and structure
+                    const formattedContent = this.formatAssistantMessage(content);
+                    messageContent.innerHTML = formattedContent;
+                } else {
+                    // For user messages, preserve line breaks but use text content
+                    messageContent.innerHTML = content.replace(/\n/g, '<br>');
+                }
 
                 if (meta) {
                     const metaDiv = document.createElement('div');
@@ -366,6 +397,34 @@
 
                 this.chatMessages.appendChild(messageDiv);
                 this.scrollToBottom();
+            }
+
+            formatAssistantMessage(content) {
+                // Split content into paragraphs and format
+                let formatted = content
+                    // Replace multiple newlines with paragraph breaks
+                    .replace(/\n\s*\n/g, '</p><p>')
+                    // Replace single newlines with line breaks
+                    .replace(/\n/g, '<br>')
+                    // Handle numbered lists
+                    .replace(/(\d+\.\s)/g, '<br><strong>$1</strong>')
+                    // Handle bullet points
+                    .replace(/([•\-\*]\s)/g, '<br>$1')
+                    // Bold text patterns (common in AI responses)
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    // Italic text patterns
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    // Handle document references
+                    .replace(/(Document \d+:)/g, '<br><strong>$1</strong>')
+                    // Clean up extra breaks at the beginning
+                    .replace(/^(<br>)+/, '');
+
+                // Wrap in paragraph tags if not already formatted
+                if (!formatted.includes('<p>')) {
+                    formatted = `<p>${formatted}</p>`;
+                }
+
+                return formatted;
             }
 
             addErrorMessage(message) {
